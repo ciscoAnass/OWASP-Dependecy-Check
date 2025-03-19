@@ -1,0 +1,43 @@
+trigger:
+- develop
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- script: echo Hello, world!
+  displayName: 'Run a one-line script'
+
+# Instalar los dependecies de Python
+- task: PythonScript@0
+  displayName: 'COnfigurar el entorno de Python | import subprocess y sys | la version | isntalar bandit y pip-audit | '
+  inputs:
+    scriptSource: 'inline'
+    script: |
+      import subprocess
+      import sys
+      print(f"Python version: {sys.version}")
+
+      subprocess.run(["python", "--version"])
+      subprocess.run(["python3", "--version"])
+
+      subprocess.run(["pip3", "install", "bandit"])
+      subprocess.run(["pip", "install", "pip-audit"])
+      subprocess.run(["pip", "install", "-r", "requirements.txt"])
+
+# Ejecutar bandit por escaneo de seguridad (dependecy check)
+- task: PythonScript@0
+  displayName: 'Bandit por dependecy check'
+  inputs:
+    scriptSource: 'inline'
+    script: |
+      import subprocess
+      subprocess.run(["bandit", "-r", "."])
+
+# Ejecutar pip-audit y mostrar el resultado 
+- task: Bash@3
+  displayName: 'Ejecutar pip-audit y mostrar resultados'
+  inputs:
+    targetType: 'inline'
+    script: |
+      pip-audit

@@ -1,0 +1,77 @@
+trigger:
+- develop
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- script: echo Hello, world!
+  displayName: 'Run a one-line script'
+
+# Crear entorno virtual
+- task: Bash@3
+  displayName: 'Crear un entorno virtual se llama anass'
+  inputs:
+    targetType: 'inline'
+    script: |
+      python -m venv anass
+      source anass/bin/activate
+      python --version
+
+# Instalar las dependencias en el entorno virtual 
+- task: Bash@3
+  displayName: 'Instalar las dependencias en el entorno virtual '
+  inputs:
+    targetType: 'inline'
+    script: |
+      source anass/bin/activate
+      pip install --upgrade pip
+      $(Build.ArtifactStagingDirectory)/dependencies
+      pip install -r requirements.txt -t $(Build.ArtifactStagingDirectory)/dependencies
+      pip install bandit pip-audit
+
+# Ejecutar pip-audit para mostrar las vulnerabilidades
+- task: Bash@3
+  displayName: 'pip-audit scan'
+  inputs:
+    targetType: 'inline'
+    script: |
+      source anass/bin/activate
+      pip-audit
+  continueOnError: true
+
+# Instalar Zip
+
+- task: Bash@3
+  displayName: 'Instalar zip'
+  inputs:
+    targetType: 'inline'
+    script: |
+      sudo apt-get install zip
+
+# Zipear la carpeta del entorno virtual y el codigo python
+- task: Bash@3
+  displayName: 'Comprimir el entorno virtual y el codigo python'
+  inputs:
+    targetType: 'inline'
+    script: |
+      # Crear directorio para el artefacto
+      sudo mkdir $(Build.ArtifactStagingDirectory)/vulnerabilities
+      cp -r $(Build.ArtifactStagingDirectory)/dependencies $(Build.ArtifactStagingDirectory)/vulnerabilities
+      cp -r *txt $(Build.ArtifactStagingDirectory)/vulnerabilities
+      cp -r *py $(Build.ArtifactStagingDirectory)/vulnerabilities
+      zip -r anass.zip $(Build.ArtifactStagingDirectory)/vulnerabilities
+      echo "Carpeta comprimida correctamente"
+
+# Publicar el artefacto
+- task: PublishBuildArtifacts@1
+  displayName: 'Publicar el artefacto'
+  inputs:
+    PathtoPublish: '/home/vsts/work/1/a/vulnerabilities/anass.zip'
+    ArtifactName: 'anass'
+    publishLocation: 'Container'
+
+# 1-Crea un entorno virtual
+# 2- Instalar dependecias en ruta
+# 3- Zipear la carpeta de ficheros python y dependencias
+# 4- Publicar artefacto
