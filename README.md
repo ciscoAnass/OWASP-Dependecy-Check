@@ -79,7 +79,7 @@ steps:
     scanPath: '$(Build.SourcesDirectory)'
     format: 'HTML'
     reportPath: '$(Build.ArtifactStagingDirectory)/dependency-check-report'
-    nvdApiKey: '034ad842-51fc-43fe-b8bd-3e9b8e44021c'
+    nvdApiKey: 'Your API'
     outputDirectory: '$(Build.ArtifactStagingDirectory)/dependency-check-report'
 
 ```
