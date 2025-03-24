@@ -1,0 +1,112 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+- stage: Build
+  displayName: 'Stage'
+  jobs:
+  - job: BuildJob
+    displayName: 'Build y Scan'
+    steps:
+    - script: echo Hello, world!
+      displayName: 'Run a one-line script'
+
+    # Construit el proyecto .NET
+    - task: DotNetCoreCLI@2
+      displayName: 'Build the project'
+      inputs:
+        command: 'build'
+        projects: '**/*.sln'
+        arguments: '--configuration Release'
+
+    # Crear artefacto
+    - task: DotNetCoreCLI@2
+      displayName: 'Crear artifactoo'
+      inputs:
+        command: 'publish'
+        publishWebProjects: true
+        arguments: '--configuration Release --output $(Build.ArtifactStagingDirectory)'
+        zipAfterPublish: true
+
+    # Crear el directorio del report
+    - task: Bash@3
+      displayName: 'Create Report Directory'
+      inputs:
+        targetType: 'inline'
+        script: 'mkdir -p $(Build.ArtifactStagingDirectory)/dependency-check-report'
+
+    # Lanzar Dependecy-Check
+    - task: dependency-check-build-task@6
+      displayName: 'Lanzar OWASP Dependecy Check'
+      inputs:
+        projectName: 'Clean.DDD.Architecture'
+        scanPath: '$(Build.SourcesDirectory)'
+        format: 'HTML'
+        reportPath: '$(Build.ArtifactStagingDirectory)/dependency-check-report'
+        nvdApiKey: 'YOU-API'
+        outputDirectory: '$(Build.ArtifactStagingDirectory)/dependency-check-report'
+
+    # Publicar el report de HTML 
+    - task: PublishHtmlReport@1
+      displayName: 'Publicar el Dependency Check en HTML Report'
+      inputs:
+        reportDir: '/home/vsts/work/1/TestResults/dependency-check'
+        tabName: 'Dependency Check Report'
+        reportHtml: 'dependency-check-report.html'
+
+    # Mostrar El contenido del fichero HTML en los logs del pipeline
+    - task: CmdLine@2
+      displayName: 'Mostrar El HTML en los logs del pipeline'
+      inputs:
+        script: |
+          echo "==================== EL REPORT DEL FICHERO HTML  ===================="
+          cat /home/vsts/work/1/TestResults/dependency-check/dependency-check-report.html
+          sudo mkdir -p /tmp/dll
+          sudo find . -type f -name "*.dll" -exec cp {} /tmp/dll/ \;
+          ls -la /tmp/dll
+          sudo apt install zip
+          zip -r /tmp/dll-anass.zip /tmp/dll/
+
+    # Publicar el fichero Zip de los binarios
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publicar el fichero ZIP de los binarios'
+      inputs:
+        PathtoPublish: '/tmp/dll-anass.zip'
+        ArtifactName: 'dll-artifacts'
+
+    # Publicar el dependecy check report
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publicar el Dependency Check Report'
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)/dependency-check-report'
+        ArtifactName: 'dependency-check-report'
+
+# Parte del Release
+- stage: Release
+  displayName: 'Release Stage'
+  dependsOn: Build
+  jobs:
+  - job: SaveBinaries
+    displayName: 'Download and Save Binaries'
+    steps:
+    # Download the build artifacts
+    - task: DownloadBuildArtifacts@1
+      displayName: 'Download Build Artifacts'
+      inputs:
+        artifactName: 'dll-artifacts'
+        downloadPath: '$(System.ArtifactsDirectory)'
+
+    # Despligue de la web app
+    - task: AzureWebApp@1
+      displayName: 'Deploy to Azure Web App'
+      inputs:
+        azureSubscription: 'SC-FORMACION'
+        appName: 'web-anass'
+        package: '$(System.ArtifactsDirectory)/dll-artifacts/dll-anass.zip'
