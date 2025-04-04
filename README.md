@@ -1,6 +1,6 @@
 # OWASP Dependecy Check
 
-# Dependecy Check for C# 
+# Dependecy Check for .NET Projects
 
 ## Define the pipeline trigger
 
